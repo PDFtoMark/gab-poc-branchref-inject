@@ -1,0 +1,28 @@
+name: refprobe
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: get pr info
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base_ref_name="$(gh pr view ${{ github.event.number }} -R ${{ github.repository }} --json 'headRefName' | jq -r .headRefName)"
+          echo "base_ref_name=$base_ref_name" >> "$GITHUB_OUTPUT"
+      - name: reproduce sink (comments.yaml line 88 shape)
+        id: sink
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          gh workflow run e2e.yaml --ref "${{ steps.pr_info.outputs.base_ref_name }}" -R ${{ github.repository }} -f upgrade_test=true
+      - name: show marker
+        run: |
+          ls -la
+          cat PWNED_BY_BRANCH_NAME 2>/dev/null || echo "no marker file"
